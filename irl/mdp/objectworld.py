@@ -12,6 +12,7 @@ import numpy as np
 import numpy.random as rn
 
 from .gridworld import Gridworld
+import matplotlib.pyplot as plt
 
 class OWObject(object):
     """
@@ -24,7 +25,7 @@ class OWObject(object):
         outer_colour: Outer colour of object. int.
         -> OWObject
         """
-
+        self.colors=['r','b','g','y']
         self.inner_colour = inner_colour
         self.outer_colour = outer_colour
 
@@ -55,6 +56,8 @@ class Objectworld(Gridworld):
 
         super().__init__(grid_size, wind, discount)
 
+        np.random.seed(1)
+
         self.actions = ((1, 0), (0, 1), (-1, 0), (0, -1), (0, 0))
         self.n_actions = len(self.actions)
         self.n_objects = n_objects
@@ -82,6 +85,47 @@ class Objectworld(Gridworld):
               for j in range(self.n_actions)]
              for i in range(self.n_states)])
 
+    def plot_grid (self, filename="grid_world.png", policy=[]):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, xlim=(0, self.grid_size),
+                                  ylim=(0, self.grid_size))
+        font_size = 'x-large'
+        plt.title("Gridworld")
+
+        cell_color = ['black', 'gray', 'white']
+
+        for i in range(self.n_states):
+            x, y = self.int_to_point(i)
+            c_x = x + 0.5
+            c_y = y + 0.5
+            rect_color = cell_color[self.reward(i)+1]
+            if (rect_color == 'black'):
+                ec = 'white'
+            else:
+                ec = 'black'
+            p = plt.Rectangle([x, y], 1, 1, ec=ec)
+            p.set_facecolor(rect_color)
+            ax.add_patch(p)
+
+            if (x, y) in self.objects:
+                obj = self.objects[x, y]
+                inner_color = obj.colors[obj.inner_colour]
+                outer_color = obj.colors[obj.outer_colour]
+
+                outer_circle = plt.Circle((c_x, c_y), 0.25, color=outer_color)
+                inner_circle = plt.Circle((c_x, c_y), 0.1, color=inner_color)
+
+                ax.add_artist(outer_circle)
+                ax.add_artist(inner_circle)
+
+            if len(policy) > 0:
+                actions = [">", "^", "<", "v", "-"]
+                action = actions[policy[i]]
+                ax.text(c_x, c_y, action, color='c', weight='bold',
+                    fontsize=20, ha='center', va='center')
+
+        plt.savefig(filename, format='png', dpi=150)
+        plt.close()
     def feature_vector(self, i, discrete=True):
         """
         Get the feature vector associated with a state integer.
@@ -186,7 +230,8 @@ class Objectworld(Gridworld):
             return -1
         return 0
 
-    def generate_trajectories(self, n_trajectories, trajectory_length, policy):
+    def generate_trajectories(self, n_trajectories, trajectory_length, policy,
+                              random_start=True, start_state=(0, 0)):
         """
         Generate n_trajectories trajectories with length trajectory_length.
 
@@ -198,7 +243,7 @@ class Objectworld(Gridworld):
 
         return super().generate_trajectories(n_trajectories, trajectory_length,
                                              policy,
-                                             True)
+                                             random_start, start_state)
 
     def optimal_policy(self, state_int):
         raise NotImplementedError(

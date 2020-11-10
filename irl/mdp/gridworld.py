@@ -7,6 +7,7 @@ matthew.alger@anu.edu.au
 
 import numpy as np
 import numpy.random as rn
+import matplotlib.pyplot as plt
 
 class Gridworld(object):
     """
@@ -21,7 +22,7 @@ class Gridworld(object):
         -> Gridworld
         """
 
-        self.actions = ((1, 0), (0, 1), (-1, 0), (0, -1))
+        self.actions = ((1, 0), (0, 1), (-1, 0), (0, -1), (0, 0))
         self.n_actions = len(self.actions)
         self.n_states = grid_size**2
         self.grid_size = grid_size
@@ -39,6 +40,36 @@ class Gridworld(object):
         return "Gridworld({}, {}, {})".format(self.grid_size, self.wind,
                                               self.discount)
 
+    def plot_grid (self, filename="grid_world.png", policy=[]):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, xlim=(0, self.grid_size),
+                                  ylim=(0, self.grid_size))
+        font_size = 'x-large'
+        plt.title("Gridworld")
+
+        cell_color = ['black', 'gray', 'white']
+
+        for i in range(self.n_states):
+            x, y = self.int_to_point(i)
+            c_x = x + 0.5
+            c_y = y + 0.5
+            rect_color = cell_color[self.reward(i)+1]
+            if (rect_color == 'black'):
+                ec = 'white'
+            else:
+                ec = 'black'
+            p = plt.Rectangle([x, y], 1, 1, ec=ec)
+            p.set_facecolor(rect_color)
+            ax.add_patch(p)
+
+            if len(policy) > 0:
+                actions = [">", "^", "<", "v", "-"]
+                action = actions[policy[i]]
+                ax.text(c_x, c_y, action, color='c', weight='bold',
+                    fontsize=20, ha='center', va='center')
+
+        plt.savefig(filename, format='png', dpi=150)
+        plt.close()
     def feature_vector(self, i, feature_map="ident"):
         """
         Get the feature vector associated with a state integer.
@@ -184,7 +215,9 @@ class Gridworld(object):
         -> Reward.
         """
 
-        if state_int == self.n_states - 1:
+#        if state_int == self.n_states - 1:
+#            return 1
+        if state_int == self.point_to_int((5,5)):
             return 1
         return 0
 
@@ -242,7 +275,8 @@ class Gridworld(object):
         return 1
 
     def generate_trajectories(self, n_trajectories, trajectory_length, policy,
-                                    random_start=False):
+                                    random_start=False,
+                                    start_state=(0, 0)):
         """
         Generate n_trajectories trajectories with length trajectory_length,
         following the given policy.
@@ -259,7 +293,7 @@ class Gridworld(object):
             if random_start:
                 sx, sy = rn.randint(self.grid_size), rn.randint(self.grid_size)
             else:
-                sx, sy = 0, 0
+                sx, sy = start_state
 
             trajectory = []
             for _ in range(trajectory_length):
