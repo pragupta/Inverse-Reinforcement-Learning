@@ -50,6 +50,8 @@ def main(grid_size, discount, n_objects, n_colours, n_trajectories, epochs,
 
     print("trajectories = ", trajectories.shape)
     print("epochs = ", epochs)
+    print("feature_matrix.shape = ", feature_matrix.shape)
+    print("policy.shape = ", policy.shape)
     ow.plot_grid("policy_{}_{}_{}.png".format(algo,
                                 n_trajectories, epochs), policy)
 
@@ -58,7 +60,7 @@ def main(grid_size, discount, n_objects, n_colours, n_trajectories, epochs,
         import irl.maxent as maxent
         r = maxent.irl(feature_matrix, ow.n_actions, discount,
                        ow.transition_probability,
-                       trajectories, epochs, learning_rate)
+                       trajectories, epochs, learning_rate, ow)
     elif algo == "deep_maxnet":
         import irl.deep_maxent as deep_maxent
         l1 = l2 = 0

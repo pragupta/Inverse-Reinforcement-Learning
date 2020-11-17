@@ -13,7 +13,7 @@ import numpy.random as rn
 from . import value_iteration
 
 def irl(feature_matrix, n_actions, discount, transition_probability,
-        trajectories, epochs, learning_rate):
+        trajectories, epochs, learning_rate, ow):
     """
     Find the reward function for the given trajectories.
 
@@ -42,16 +42,26 @@ def irl(feature_matrix, n_actions, discount, transition_probability,
     feature_expectations = find_feature_expectations(feature_matrix,
                                                      trajectories)
 
+    print("feature_expectations (aka empericial value)",
+          feature_expectations)
     # Gradient descent on alpha.
-    for i in range(epochs):
-        # print("i: {}".format(i))
+#    for i in range(epochs):
+    i = 0
+    delta = np.inf
+    while delta > 0.003:
+        print (i, delta)
+        alpha_old = alpha.copy()
         r = feature_matrix.dot(alpha)
         expected_svf = find_expected_svf(n_states, r, n_actions, discount,
-                                         transition_probability, trajectories)
-        grad = feature_expectations - feature_matrix.T.dot(expected_svf)
+                                         transition_probability, trajectories,
+                                         ow, i)
+        feature_act = feature_matrix.T.dot(expected_svf)
+        grad = feature_expectations - feature_act
 
         alpha += learning_rate * grad
 
+        delta = np.max(np.abs(alpha_old - alpha))
+        i += 1
     return feature_matrix.dot(alpha).reshape((n_states,))
 
 def find_svf(n_states, trajectories):
@@ -100,7 +110,7 @@ def find_feature_expectations(feature_matrix, trajectories):
     return feature_expectations
 
 def find_expected_svf(n_states, r, n_actions, discount,
-                      transition_probability, trajectories):
+                      transition_probability, trajectories, ow, idx):
     """
     Find the expected state visitation frequencies using algorithm 1 from
     Ziebart et al. 2008.
@@ -121,10 +131,12 @@ def find_expected_svf(n_states, r, n_actions, discount,
     n_trajectories = trajectories.shape[0]
     trajectory_length = trajectories.shape[1]
 
-    # policy = find_policy(n_states, r, n_actions, discount,
-    #                                 transition_probability)
     policy = value_iteration.find_policy(n_states, n_actions,
                                          transition_probability, r, discount)
+
+
+    if idx % 10 == 0:
+        ow.plot_grid("policy_{}.png".format(idx), policy)
 
     start_state_count = np.zeros(n_states)
     for trajectory in trajectories:

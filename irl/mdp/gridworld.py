@@ -64,7 +64,10 @@ class Gridworld(object):
 
             if len(policy) > 0:
                 actions = [">", "^", "<", "v", "-"]
-                action = actions[policy[i]]
+                if len(policy.shape) > 1:
+                    action = actions[np.argmax(policy[i])]
+                else:
+                    action = actions[policy[i]]
                 ax.text(c_x, c_y, action, color='c', weight='bold',
                     fontsize=20, ha='center', va='center')
 
