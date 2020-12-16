@@ -10,9 +10,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from irl.value_iteration import find_policy
+from irl.value_iteration import value
+from irl.value_iteration import optimal_value
+
+def normalize(data):
+        return (data - np.min(data)) / (np.max(data) - np.min(data))
 
 def main(grid_size, discount, n_objects, n_colours, n_trajectories, epochs,
-         learning_rate, start_state, algo="maxnet", mdp="gridworld"):
+         learning_rate, start_state, wind=0.0, algo="maxnet", mdp="gridworld"):
     """
     Run inverse reinforcement learning on the objectworld MDP.
 
@@ -30,7 +35,6 @@ def main(grid_size, discount, n_objects, n_colours, n_trajectories, epochs,
     """
 
     sx, sy = start_state
-    wind = 0.3
     trajectory_length = 8
 
     if mdp == "objectworld":
@@ -40,27 +44,37 @@ def main(grid_size, discount, n_objects, n_colours, n_trajectories, epochs,
         import irl.mdp.gridworld as gridworld
         ow = gridworld.Gridworld(grid_size, wind, discount)
 
-    ground_r = np.array([ow.reward(s) for s in range(ow.n_states)])
+    ground_r  = np.array([ow.reward(s) for s in range(ow.n_states)])
     policy = find_policy(ow.n_states, ow.n_actions, ow.transition_probability,
                          ground_r, ow.discount, stochastic=False)
+    optimal_v = optimal_value(ow.n_states, ow.n_actions,
+                              ow.transition_probability,
+                              normalize(ground_r), ow.discount)
     trajectories = ow.generate_trajectories(n_trajectories,
                                             trajectory_length,
-                                            lambda s: policy[s])
+                                            lambda s: policy[s],
+                                            random_start=True)
+
     feature_matrix = ow.feature_matrix()
 
     print("trajectories = ", trajectories.shape)
     print("epochs = ", epochs)
     print("feature_matrix.shape = ", feature_matrix.shape)
     print("policy.shape = ", policy.shape)
-    ow.plot_grid("policy_{}_{}_{}.png".format(algo,
-                                n_trajectories, epochs), policy)
+#    ow.plot_grid("value_{}_t{}_e{}_w{}.png".format(algo,
+#                                n_trajectories, epochs, wind), value=optimal_v)
+    ow.plot_grid("policy_{}_t{}_e{}_w{}.png".format(algo,
+                                n_trajectories, epochs, wind),
+                                policy=policy , value=optimal_v)
 
     r = []
-    if algo == "maxnet":
+    ground_svf = []
+    if algo == "maxent":
         import irl.maxent as maxent
+        ground_svf = maxent.find_svf(ow.n_states, trajectories)
         r = maxent.irl(feature_matrix, ow.n_actions, discount,
                        ow.transition_probability,
-                       trajectories, epochs, learning_rate, ow)
+                       trajectories, epochs, learning_rate)
     elif algo == "deep_maxnet":
         import irl.deep_maxent as deep_maxent
         l1 = l2 = 0
@@ -72,28 +86,62 @@ def main(grid_size, discount, n_objects, n_colours, n_trajectories, epochs,
 
     recovered_policy = find_policy(ow.n_states, ow.n_actions,
                                    ow.transition_probability,
-                                   r, ow.discount, stochastic=False)
+                                   normalize(r), ow.discount,
+                                   stochastic=False)
+    recovered_v      = value(recovered_policy, ow.n_states,
+                                   ow.transition_probability,
+                                   normalize(r), ow.discount)
 
-    new_trajectory = ow.generate_trajectories(1,
+    new_trajectory = ow.generate_trajectories(n_trajectories,
                                             trajectory_length,
                                             lambda s: recovered_policy[s],
-                                            False, (sx, sy))
-    ow.plot_grid("recovered_policy_{}_{}_{}.png".format(algo,
-                                n_trajectories, epochs), recovered_policy)
-    print("new trajectory")
-    for t in new_trajectory:
-        for s, a, rw in t:
-            print (ow.int_to_point(s), ow.actions[a], rw)
-        print ("---------")
-    plt.subplot(1, 2, 1)
-    plt.pcolor(ground_r.reshape((grid_size, grid_size)))
+                                            True, (sx, sy))
+    recovered_svf = maxent.find_svf(ow.n_states, new_trajectory)
+
+#    ow.plot_grid("recovered_value_{}_t{}_e{}_w{}.png".format(algo,
+#                                n_trajectories, epochs, wind),
+#                                value=recovered_v)
+    ow.plot_grid("recovered_policy_{}_t{}_e{}_w{}.png".format(algo,
+                                n_trajectories, epochs, wind),
+                                policy=recovered_policy,
+                                value=recovered_v)
+
+
+
+
+#    print("new trajectory")
+#    for t in new_trajectory:
+#        for s, a, rw in t:
+#            print (ow.int_to_point(s), ow.actions[a], rw)
+#        print ("---------")
+    y, x = np.mgrid[-0.5:grid_size+0.5, -0.5:grid_size+0.5]
+
+
+    plt.subplot(111)
+
+    plt.pcolor(x, y, ground_svf.reshape((grid_size, grid_size)))
     plt.colorbar()
+    plt.title("Groundtruth SVF")
+    plt.savefig("ground_svf_{}_t{}_e{}_w{}.png".format(algo,
+                n_trajectories, epochs, wind),
+                format="png", dpi=150)
+
+    plt.pcolor(x, y, recovered_svf.reshape((grid_size, grid_size)))
+    plt.title("Recovered SVF")
+    plt.savefig("recovered_svf_{}_t{}_e{}_w{}.png".format(algo,
+                n_trajectories, epochs, wind),
+                format="png", dpi=150)
+
+    plt.pcolor(x, y, normalize(ground_r).reshape((grid_size, grid_size)))
     plt.title("Groundtruth reward")
-    plt.subplot(1, 2, 2)
-    plt.pcolor(r.reshape((grid_size, grid_size)))
-    plt.colorbar()
+    plt.savefig("ground_reward_{}_t{}_e{}_w{}.png".format(algo,
+                n_trajectories, epochs, wind),
+                format="png", dpi=150)
+
+    plt.pcolor(x, y, normalize(r).reshape((grid_size, grid_size)))
     plt.title("Recovered reward")
-    plt.savefig("reward_{}_{}_{}.png".format(algo, n_trajectories, epochs),
+    plt.savefig("recovered_reward_{}_t{}_e{}_w{}.png".format(algo,
+                n_trajectories, epochs, wind),
                 format="png", dpi=150)
 
 if __name__ == '__main__':
@@ -131,8 +179,12 @@ if __name__ == '__main__':
                         default=0, type=int,
                  help='x-value for the start state')
 
+    parser.add_argument('--wind', dest='wind',
+                        default=0, type=float,
+                 help='randomness in expert behavior')
+
     parser.add_argument('--algo', dest='algo',
-                        default="maxnet", type=str,
+                        default="maxent", type=str,
                  help='IRL algo to run')
 
     parser.add_argument('--mdp', dest='mdp',
@@ -143,5 +195,5 @@ if __name__ == '__main__':
 
     main(args.grid_size, args.discount, args.n_objects, args.n_colors,
          args.n_trajectories, args.epochs, args.lr, (args.sx, args.sy),
-         args.algo)
+         args.wind, args.algo, args.mdp)
 

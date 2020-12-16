@@ -40,24 +40,31 @@ class Gridworld(object):
         return "Gridworld({}, {}, {})".format(self.grid_size, self.wind,
                                               self.discount)
 
-    def plot_grid (self, filename="grid_world.png", policy=[]):
+    def plot_grid (self, filename="grid_world.png", policy=[], value=[]):
         fig = plt.figure()
         ax = fig.add_subplot(111, xlim=(0, self.grid_size),
                                   ylim=(0, self.grid_size))
+
+
         font_size = 'x-large'
-        plt.title("Gridworld")
+        ax.title.set_text("Gridworld")
 
         cell_color = ['black', 'gray', 'white']
 
         for i in range(self.n_states):
             x, y = self.int_to_point(i)
-            c_x = x + 0.5
-            c_y = y + 0.5
-            rect_color = cell_color[self.reward(i)+1]
-            if (rect_color == 'black'):
+            c_x = x
+            c_y = y
+
+            x = x - 0.5
+            y = y - 0.5
+            if self.reward(i) == 0:
+                rect_color = 'gray'
                 ec = 'white'
             else:
+                rect_color = 'white'
                 ec = 'black'
+
             p = plt.Rectangle([x, y], 1, 1, ec=ec)
             p.set_facecolor(rect_color)
             ax.add_patch(p)
@@ -68,9 +75,18 @@ class Gridworld(object):
                     action = actions[np.argmax(policy[i])]
                 else:
                     action = actions[policy[i]]
-                ax.text(c_x, c_y, action, color='c', weight='bold',
-                    fontsize=20, ha='center', va='center')
+                ax.text(c_x, c_y, action, color='k', #weight='bold',
+                    fontsize=10, ha='center', va='top')
 
+            if len(value) > 0:
+                ax.text(c_x, c_y, round(value[i], 2), color='k', #weight='bold',
+                    fontsize=8, ha='center', va='bottom')
+
+        ax.set_xlim(-0.5, self.grid_size - 0.5)
+        ax.set_ylim(-0.5, self.grid_size - 0.5)
+
+        ax.set_xticks(range(self.grid_size))
+        ax.set_yticks(range(self.grid_size))
         plt.savefig(filename, format='png', dpi=150)
         plt.close()
     def feature_vector(self, i, feature_map="ident"):
@@ -220,8 +236,12 @@ class Gridworld(object):
 
 #        if state_int == self.n_states - 1:
 #            return 1
-        if state_int == self.point_to_int((5,5)):
-            return 1
+        points = {self.point_to_int((0,0)) : 1,
+                  self.point_to_int((0,9)) : 1,
+                  self.point_to_int((9,0)) : 1,
+                  self.point_to_int((9,9)) : 1}
+        if state_int in points:
+            return points[state_int]
         return 0
 
     def average_reward(self, n_trajectories, trajectory_length, policy):
